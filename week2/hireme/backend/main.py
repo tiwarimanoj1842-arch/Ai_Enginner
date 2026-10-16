@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from pydantic import BaseModel
 from pypdf import PdfReader
@@ -15,7 +17,23 @@ client = Groq(
 )
 
 model = "openai/gpt-oss-120b"
-app=FastAPI()
+
+resume = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global resume
+    resume = parse_resume(read_pdf(Path("my_resume.pdf")))   # server start hote hi 1 baar
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 
@@ -173,14 +191,16 @@ def home():
 #chatgot.com/aceeddferre5e
 
 
+
+
+@app.get("/")
+def home():
+    return {"message": "Ye home page hai"}
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
-    resume_text=read_pdf(Path("my_resume.pdf"))
-    resume=parse_resume(resume_text)
-    answer=ask_candidate(request.question, resume)
-    return {
-        "answer": answer
-    }
+    return {"answer": ask_candidate(request.question, resume)}
 
 
 
